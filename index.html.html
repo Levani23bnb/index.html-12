@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SayGM Arc Testnet</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.8.0/dist/ethers.min.js"></script>
+<style>
+body { 
+    font-family: Arial, sans-serif; 
+    padding: 20px; 
+    background: #f0f4f8; 
+    color: #0d1b2a;
+}
+
+h1, h2 { color: #1e3a8a; }
+
+input, textarea { 
+    width: 100%; 
+    padding: 10px; 
+    margin-top: 5px; 
+    border: 1px solid #1e3a8a; 
+    border-radius: 6px;
+    background: #ffffff;
+    color: #0d1b2a;
+    font-size: 16px;
+}
+
+button { 
+    padding: 12px 25px; 
+    margin-top: 10px; 
+    cursor: pointer; 
+    border: none;
+    border-radius: 6px;
+    background: #1e3a8a; /* deep blue */
+    color: #ffffff;
+    font-size: 16px;
+    transition: background 0.3s;
+}
+
+button:hover {
+    background: #3b5bdb; /* lighter blue on hover */
+}
+
+#leaderboard { 
+    margin-top: 20px; 
+    background:#ffffff; 
+    padding: 15px; 
+    border-radius: 10px; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#leaderboard div {
+    padding: 6px 0;
+    border-bottom: 1px solid #e0e7ff;
+}
+
+#leaderboard div:last-child {
+    border-bottom: none;
+}
+</style>
+</head>
+<body>
+
+<h1>SayGM Arc Testnet</h1>
+
+<p>Send a GM and climb the leaderboard!</p>
+
+<input id="gmMessage" placeholder="Type your GM message..." />
+<button id="sendGM">Send GM</button>
+
+<h2>Leaderboard</h2>
+<div id="leaderboard"></div>
+
+<script>
+// 🟢 CONTRACT SETTINGS
+const contractAddress = "0x23ab4815ceADF585AE0e925DF082974493ba1312";
+const contractABI = [
+  "function sayGM(string message) external payable",
+  "function getTopUsers(uint256 n) external view returns (tuple(address user,uint256 currentStreak,uint256 longestStreak,uint256 totalGMs)[])",
+  "function gmFee() external view returns (uint256)"
+];
+
+let provider, signer, contract;
+
+async function init() {
+    if (window.ethereum) {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(contractAddress, contractABI, signer);
+        updateLeaderboard();
+    } else {
+        alert("Please install MetaMask or compatible wallet.");
+    }
+}
+
+async function sendGM() {
+    const message = document.getElementById("gmMessage").value;
+    if (!message) return alert("Type a GM message!");
+
+    const fee = await contract.gmFee();
+    try {
+        const tx = await contract.sayGM(message, { value: fee });
+        await tx.wait();
+        alert("GM sent! ✅");
+        updateLeaderboard();
+    } catch (e) {
+        console.error(e);
+        alert("Error sending GM. See console.");
+    }
+}
+
+async function updateLeaderboard() {
+    const top = await contract.getTopUsers(10);
+    const container = document.getElementById("leaderboard");
+    container.innerHTML = "";
+    top.forEach((u,i)=>{
+        const div = document.createElement("div");
+        div.textContent = `${i+1}. ${u.user} | Streak: ${u.currentStreak} | Longest: ${u.longestStreak} | Total GMs: ${u.totalGMs}`;
+        container.appendChild(div);
+    });
+}
+
+document.getElementById("sendGM").onclick = sendGM;
+
+init();
+</script>
+
+</body>
+</html>
