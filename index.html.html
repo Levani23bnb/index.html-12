@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SayGM Arc Testnet</title>
+<title>SayGM Testnet</title>
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.0/dist/ethers.min.js"></script>
 <style>
 body { 
@@ -62,7 +62,7 @@ button:hover {
 </head>
 <body>
 
-<h1>SayGM Arc Testnet</h1>
+<h1>SayGM Testnet</h1>
 
 <p>Send a GM and climb the leaderboard!</p>
 
@@ -74,7 +74,7 @@ button:hover {
 
 <script>
 // 🟢 CONTRACT SETTINGS
-const contractAddress = "0x23ab4815ceADF585AE0e925DF082974493ba1312";
+const contractAddress = "0x23ab4815ceADF585AE0e925DF082974493ba1312"; // შეცვალე შენს DEPLOY CONTRACT ADDRESS
 const contractABI = [
   "function sayGM(string message) external payable",
   "function getTopUsers(uint256 n) external view returns (tuple(address user,uint256 currentStreak,uint256 longestStreak,uint256 totalGMs)[])",
@@ -85,11 +85,16 @@ let provider, signer, contract;
 
 async function init() {
     if (window.ethereum) {
-        provider = new ethers.BrowserProvider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        signer = await provider.getSigner();
-        contract = new ethers.Contract(contractAddress, contractABI, signer);
-        updateLeaderboard();
+        try {
+            await window.ethereum.request({ method: "eth_requestAccounts" });
+            provider = new ethers.JsonRpcProvider(window.ethereum);
+            signer = provider.getSigner();
+            contract = new ethers.Contract(contractAddress, contractABI, signer);
+            updateLeaderboard();
+        } catch (err) {
+            console.error("Wallet connection failed", err);
+            alert("Wallet connection failed. See console.");
+        }
     } else {
         alert("Please install MetaMask or compatible wallet.");
     }
@@ -99,31 +104,36 @@ async function sendGM() {
     const message = document.getElementById("gmMessage").value;
     if (!message) return alert("Type a GM message!");
 
-    const fee = await contract.gmFee();
     try {
+        const fee = await contract.gmFee(); // get current fee from contract
         const tx = await contract.sayGM(message, { value: fee });
-        await tx.wait();
+        await tx.wait(); // wait for transaction confirmation
         alert("GM sent! ✅");
         updateLeaderboard();
-    } catch (e) {
-        console.error(e);
-        alert("Error sending GM. See console.");
+    } catch (err) {
+        console.error("Transaction failed", err);
+        alert("Transaction failed. See console.");
     }
 }
 
 async function updateLeaderboard() {
-    const top = await contract.getTopUsers(10);
-    const container = document.getElementById("leaderboard");
-    container.innerHTML = "";
-    top.forEach((u,i)=>{
-        const div = document.createElement("div");
-        div.textContent = `${i+1}. ${u.user} | Streak: ${u.currentStreak} | Longest: ${u.longestStreak} | Total GMs: ${u.totalGMs}`;
-        container.appendChild(div);
-    });
+    try {
+        const top = await contract.getTopUsers(10);
+        const container = document.getElementById("leaderboard");
+        container.innerHTML = "";
+        top.forEach((u,i)=>{
+            const div = document.createElement("div");
+            div.textContent = `${i+1}. ${u.user} | Streak: ${u.currentStreak} | Longest: ${u.longestStreak} | Total GMs: ${u.totalGMs}`;
+            container.appendChild(div);
+        });
+    } catch(err) {
+        console.error("Leaderboard fetch failed", err);
+    }
 }
 
 document.getElementById("sendGM").onclick = sendGM;
 
+// Init on page load
 init();
 </script>
 
